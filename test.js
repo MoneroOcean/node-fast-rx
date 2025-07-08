@@ -3,7 +3,7 @@
 "use strict";
 
 const path    = require("path");
-const fast_rx = require(path.join(__dirname, 'node-fast-rx.js'));
+const fast_rx = require(path.join(__dirname, 'index.js'));
 
 // compute core wrapper for cluster process fork
 if (fast_rx.cluster_process()) return;

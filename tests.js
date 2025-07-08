@@ -50,11 +50,6 @@ function test(job, result, cb) {
   });
 }
 
-function test_gpu(job, result, cb) {
-  job.dev = "gpu1*8";
-  test(job, result, cb);
-}
-
 let tests = [
   [ test, { algo: "rx/0", blob_hex: "5468697320697320612074657374" },
     "38f638606c730dd6f271d037556b83988c71acc6980e22e25271b22389ecfce6"

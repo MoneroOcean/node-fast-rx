@@ -1,5 +1,5 @@
 { "targets": [
-  { "target_name": "node-fast-rx",
+  { "target_name": "fast-rx",
     "sources": [
       "moner-core.cpp",
       "moner-job.cpp",
