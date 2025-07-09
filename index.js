@@ -69,10 +69,15 @@ module.exports.messageWorkers = function(msg) {
   for (const worker_id of worker_ids) if (cluster.workers[worker_id]) cluster.workers[worker_id].send(msg);
 };
 
+module.exports.record_thread = function(thread_id) {
+  worker_ids = []
+  worker_ids.push(thread_id);
+};
+
 module.exports.create_thread = function(messageHandler) {
   let thread = cluster.fork({thread_id: 0});
   thread.on("message", messageHandler);
-  worker_ids.push(thread.id);
+  module.exports.record_thread(thread.id);
 };
 
 // get thread dev stripping ^thread specification from it
