@@ -8,7 +8,7 @@ function test(job, result, cb) {
   if (!("dev" in job))      job.dev      = "cpu";
   if (!("blob_hex" in job)) job.blob_hex = "0305A0DBD6BF05CF16E503F3A66F78007CBF34144332ECBFC22ED95C8700383B309ACE1923A0964B00000008BA939A62724C0D7581FCE5761E9D8A0E6A1C3F924FDD8493D1115649C05EB601";
   if (!("seed_hex" in job)) job.seed_hex = "3132333435363738393031323334353637383930313233343536373839303132";
-  const cmd = "node test.js " + result + " '" + JSON.stringify(job) + "'";
+  const cmd = "node test.js '" + JSON.stringify(job) + "' " + (Array.isArray(result) ? result.join(' ') : result);
   let output = "";
   const fail = function(message) {
     console.log("FAILED: " + job.dev + " " + job.algo + ": ");
@@ -51,8 +51,10 @@ function test(job, result, cb) {
 }
 
 let tests = [
-  [ test, { algo: "rx/0", blob_hex: "5468697320697320612074657374" },
-    "38f638606c730dd6f271d037556b83988c71acc6980e22e25271b22389ecfce6"
+  [ test, { algo: "rx/0", dev: "cpu*2", blob_hex: "5468697320697320612074657374\n00" },
+    [ "38f638606c730dd6f271d037556b83988c71acc6980e22e25271b22389ecfce6",
+      "f4d7978d385b7d79788aed32cf9e08d2782bc3c47ab50cae69c0dfba3a3bd1d7"
+    ]
   ], [ test, { algo: "rx/wow", blob_hex: "5468697320697320612074657374" },
     "15c9bd99b3180ab256e89beecaf7b693abb7cdb0d1dfe30020c72f0c70b904ce"
   ], [ test, { algo: "rx/arq", blob_hex: "5468697320697320612074657374" },

@@ -120,8 +120,8 @@ void Core::free_memory(
     if (m_lpads) { delete m_lpads; m_lpads = nullptr; }
   }
   if (is_batch_changed) {
-    if (m_input)  { free_mem(m_input);  m_input  = nullptr; }
-    if (m_output) { free_mem(m_output); m_output = nullptr; }
+    if (m_input_cn) { free_mem(m_input_cn); m_input_cn = nullptr; }
+    if (m_output)   { free_mem(m_output);   m_output   = nullptr; }
   }
   if (is_batch_changed || is_mem_size_changed || is_free_cn) {
     if (m_ctx) { xmrig::CnCtx::release(m_ctx, m_batch); delete [] m_ctx; m_ctx = nullptr; }
@@ -228,7 +228,7 @@ void Core::Execute(const AsyncProgressQueueWorker<char>::ExecutionProgress& prog
       try {
         switch (m_dev) {
           case DEV::CPU:
-            m_fn.cpu(m_input, m_input_len, m_output, m_ctx, m_height);
+            m_fn.cpu(m_input_cn, m_input_cn_len, m_output, m_ctx, m_height);
             break;
 
           case DEV::RX_CPU: throw "Internal error: Unreachable code executed";
@@ -259,7 +259,7 @@ void Core::Execute(const AsyncProgressQueueWorker<char>::ExecutionProgress& prog
 
       const uint32_t prev_nonce = m_nonce;
       for (unsigned i = 0; i != m_batch; ++i) {
-        uint32_t* const pnonce = get_nonce(i);
+        uint32_t* const pnonce = get_nonce_cn(i);
         if (m_target && *get_result(i) < m_target) send_result(*pnonce, m_output + HASH_LEN * i);
         *pnonce = m_nonce;
         m_nonce += m_nonce_step;

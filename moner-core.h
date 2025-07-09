@@ -35,8 +35,8 @@ class Core: public AsyncWorker {
   xmrig::VirtualMemory *m_lpads, *m_rx_cache_mem, *m_rx_dataset_mem;
   void* m_spads;
   struct cryptonight_ctx** m_ctx;
-  uint8_t *m_input, *m_output;
-  unsigned m_job_ref, m_height, m_batch, m_mem_size, m_input_len, m_nonce_step, m_nonce_offset;
+  uint8_t *m_input_cn, *m_output;
+  unsigned m_job_ref, m_height, m_batch, m_mem_size, m_input_cn_len, m_nonce_step, m_nonce_offset;
   uint32_t m_nonce; // next nonce that will be used in an input
   uint64_t m_target, m_timestamp, m_hash_count;
   std::string m_algo_str, m_dev_str, m_seed_hex, m_input_hex, m_pool_id, m_worker_id, m_job_id;
@@ -47,11 +47,11 @@ class Core: public AsyncWorker {
   randomx_vm** m_vm;
   std::mutex m_mutex_hashrate;
 
-  inline uint32_t* get_nonce(uint8_t* const input, const unsigned batch = 0) {
-    return reinterpret_cast<uint32_t*>(input + (batch * m_input_len) + m_nonce_offset);
+  inline uint32_t* get_nonce(uint8_t* const input) {
+    return reinterpret_cast<uint32_t*>(input + m_nonce_offset);
   }
-  inline uint32_t* get_nonce(const unsigned batch) {
-    return get_nonce(m_input, batch);
+  inline uint32_t* get_nonce_cn(const unsigned batch) {
+    return reinterpret_cast<uint32_t*>(m_input_cn + (batch * m_input_cn_len) + m_nonce_offset);
   }
   inline const uint64_t* get_result(const uint8_t* const output, const unsigned batch = 0) const {
     return reinterpret_cast<const uint64_t*>(output + (batch * HASH_LEN) + 24);
@@ -94,8 +94,8 @@ class Core: public AsyncWorker {
     Nan::Callback* const error_callback,  const v8::Local<v8::Object>& options
   ) : AsyncWorker(data, complete, error_callback), m_progress(nullptr),
       m_lpads(nullptr), m_rx_cache_mem(nullptr), m_rx_dataset_mem(nullptr),
-      m_spads(nullptr), m_ctx(nullptr), m_input(nullptr), m_output(nullptr),
-      m_job_ref(0), m_height(0), m_batch(0), m_mem_size(0), m_input_len(0),
+      m_spads(nullptr), m_ctx(nullptr), m_input_cn(nullptr), m_output(nullptr),
+      m_job_ref(0), m_height(0), m_batch(0), m_mem_size(0), m_input_cn_len(0),
       m_nonce_step(1), m_nonce_offset(39), m_nonce(0), m_target(0),
       m_timestamp(0), m_hash_count(0),
       m_is_rx_jit(true), m_is_nicehash(true), m_rx_cache(nullptr), m_rx_dataset(nullptr),

@@ -119,6 +119,14 @@ static randomx_flags get_rx_vm_flags(
   return static_cast<randomx_flags>(rx_flags);
 }
 
+std::vector<std::string> split_input(const std::string& str) {
+  std::vector<std::string> lines;
+  std::istringstream stream(str);
+  std::string line;
+  while (std::getline(stream, line)) if (!line.empty()) lines.push_back(line);
+  return lines;
+}
+
 void Core::set_job(
   const bool is_set_nonce, const bool is_no_same_input, const MessageValues& v,
   std::function<void(void)> fn_extra_setup
@@ -187,12 +195,27 @@ void Core::set_job(
     }
   }
 
-  uint8_t new_input[MAX_BLOB_LEN];
-  const unsigned new_input_len = new_input_hex.size() >> 1;
-  if ((new_input_hex.size() & 1) || new_input_len > MAX_BLOB_LEN)
-    throw std::string("Bad input length");
-  if (!hex2bin(new_input_hex.c_str(), new_input_len, new_input))
-    throw std::string("Bad input hex");
+  std::vector<std::string> new_input_hexes = split_input(new_input_hex);
+  if (new_dev == DEV::RX_CPU) {
+    // duplicate one input accross all thread inputs (batches)
+    if (new_input_hexes.size() == 1 && new_batch > 1) new_input_hexes.assign(new_batch, new_input_hex);
+    else if (new_input_hexes.size() != new_batch) throw std::string("Number of inputs do not match batch number");
+  } else {
+    if (new_input_hexes.size() != 1) throw std::string("Multiple inputs are only supported for RX algos");
+  }
+
+  // need static here so it will be alive in rx threads
+  static std::vector<std::vector<uint8_t> > new_inputs;
+  new_inputs.clear();
+  for (const auto& new_input_hex: new_input_hexes) {
+    std::cout << new_input_hex << std::endl;
+    const unsigned new_input_len = new_input_hex.size() >> 1;
+    if ((new_input_hex.size() & 1) || new_input_len > MAX_BLOB_LEN)
+      throw std::string("Bad input length");
+    new_inputs.emplace_back(new_input_len);
+    if (!hex2bin(new_input_hex.c_str(), new_input_len, new_inputs.back().data()))
+      throw std::string("Bad input hex");
+  }
 
   // new hashing setup (all errors were checked above)
   ++ m_job_ref; // used to stop old m_thread_pool jobs
@@ -256,7 +279,8 @@ void Core::set_job(
         }
       }
     } else { // setup cn stuff
-      if (m_input == nullptr) m_input = static_cast<uint8_t*>(alloc_mem(new_batch * MAX_BLOB_LEN));
+      m_input_cn_len = new_inputs[0].size();
+      if (m_input_cn == nullptr) m_input_cn = static_cast<uint8_t*>(alloc_mem(new_batch * MAX_BLOB_LEN));
       if (m_output == nullptr) m_output = static_cast<uint8_t*>(alloc_mem(new_batch * HASH_LEN));
       if (m_spads == nullptr) m_spads = alloc_mem(new_batch * 200);
       if (m_ctx == nullptr) {
@@ -276,15 +300,11 @@ void Core::set_job(
   m_dev_str      = new_dev_str2;
   m_height       = new_height;
   m_nonce_offset = new_nonce_offset;
-  m_input_len    = new_input_len;
   m_is_nicehash  = new_nicehash;
   fn_extra_setup();
 
   // start rx job compute threads
   if (new_dev == DEV::RX_CPU) {
-    // need static copy here so it will be alive in rx threads
-    static uint8_t new_input2[MAX_BLOB_LEN];
-    memcpy(new_input2, new_input, m_input_len);
     const unsigned job_ref = m_job_ref;
     for (unsigned batch_id = 0; batch_id != m_batch; ++batch_id) m_thread_pool->push(
       [=, &m_job_ref = m_job_ref, &m_hash_count = m_hash_count](int thread_id) {
@@ -293,12 +313,13 @@ void Core::set_job(
           alignas(16) uint8_t  output[HASH_LEN];
           alignas(16) uint64_t temp_hash[8];
           uint32_t nonce = new_nonce + new_thread_id * m_batch + batch_id;
-          if (m_is_nicehash) nonce |= *get_nonce(new_input2) & 0xFF000000;
+          if (m_is_nicehash) nonce |= *get_nonce(new_inputs[thread_id].data()) & 0xFF000000;
           const unsigned nonce_step = new_thread_num * m_batch;
           unsigned hashrate_update_counter = HASHRATE_COUNTER_INTERVAL;
-          memcpy(input, new_input2, m_input_len);
+	  const unsigned input_len = new_inputs[thread_id].size();
+          memcpy(input, new_inputs[thread_id].data(), input_len);
           if (is_set_nonce) { *get_nonce(input) = nonce; nonce += nonce_step; }
-          randomx_calculate_hash_first(m_vm[thread_id], temp_hash, input, m_input_len);
+          randomx_calculate_hash_first(m_vm[thread_id], temp_hash, input, input_len);
           while (job_ref == m_job_ref) { // continue until we get a new job
             uint32_t* const pnonce = get_nonce(input);
             const uint32_t prev_nonce = nonce;
@@ -309,12 +330,13 @@ void Core::set_job(
               send_error("Nonce overflow");
               break; // will also effectively stops this thread
             }
-            randomx_calculate_hash_next(m_vm[thread_id], temp_hash, input, m_input_len, output);
+            randomx_calculate_hash_next(m_vm[thread_id], temp_hash, input, input_len, output);
 
             if (!is_set_nonce) { // test job
               char hash[HASH_LEN*2+1];
               MessageValues values;
               values["result"] = hash_bin2hex(output, hash);
+	      values["rx_thread_id"] = std::to_string(thread_id);
               values["job_id"] = job_id;
               send_msg("test", values);
               break;
@@ -339,11 +361,11 @@ void Core::set_job(
     );
   } else {
     m_nonce = new_nonce + new_thread_id;
-    if (m_is_nicehash) m_nonce |= *get_nonce(new_input) & 0xFF000000;
+    if (m_is_nicehash) m_nonce |= *get_nonce(new_inputs[0].data()) & 0xFF000000;
     m_nonce_step = new_thread_num;
     for (unsigned i = 0; i != m_batch; ++i) {
-      memcpy(m_input + m_input_len*i, new_input, m_input_len);
-      if (is_set_nonce) { *get_nonce(i) = m_nonce; m_nonce += m_nonce_step; }
+      memcpy(m_input_cn + m_input_cn_len*i, new_inputs[0].data(), m_input_cn_len);
+      if (is_set_nonce) { *get_nonce_cn(i) = m_nonce; m_nonce += m_nonce_step; }
     }
   }
 }

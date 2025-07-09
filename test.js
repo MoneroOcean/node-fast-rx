@@ -9,8 +9,8 @@ const fast_rx = require(path.join(__dirname, 'index.js'));
 if (fast_rx.cluster_process()) return;
 
 let args = process.argv.slice(2);
-const result_hex = args.shift();
-const job        = JSON.parse(args.shift());
+const job          = JSON.parse(args.shift());
+const result_hexes = args;
 
 function exit(code) {
   fast_rx.messageWorkers({type: "close"});
@@ -22,20 +22,21 @@ function exit(code) {
 function messageHandler(msg) {
   switch (msg.type) {
     case "test":
-      // duplicate test result for batch size
-      let result_hex2 = result_hex;
-      // for rx algos threads are encoded in batch
       const is_rx = job.algo.includes("rx/");
+      // duplicate test result for batch size
+      let result_hex2 = is_rx ? result_hexes[msg.value.rx_thread_id] : result_hexes[0];
+      // for rx algos threads are encoded in batch
       const batch = fast_rx.get_dev_batch(fast_rx.get_thread_dev(msg.thread_id, job.dev));
       const rx_batch = is_rx ? 1 : batch;
-      for (let i = 1; i < rx_batch; ++ i) result_hex2 += " " + result_hex;
-      if (msg.value.result !== result_hex2) {
-        console.error("FAILED: " + msg.value.result + " != " + result_hex);
-	exit(1);
+      let result_hex3 = result_hex2;
+      for (let i = 1; i < rx_batch; ++ i) result_hex3 += " " + result_hex2;
+      if (msg.value.result !== result_hex3) {
+        console.error("FAILED: " + msg.value.result + " != " + result_hex3);
+	return exit(1);
+      } else {
+        console.log("PASSED");
+        return exit(0);
       }
-      console.log("PASSED");
-      exit(0);
-      break;
 
     case "error":
       console.error("Compute core error: " + JSON.stringify(msg.value));
