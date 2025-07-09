@@ -195,7 +195,9 @@ void Core::set_job(
     }
   }
 
-  std::vector<std::string> new_input_hexes = split_input(new_input_hex);
+  // need static here so it will be alive in rx threads
+  static std::vector<std::string> new_input_hexes;
+  new_input_hexes = split_input(new_input_hex);
   if (new_dev == DEV::RX_CPU) {
     // duplicate one input accross all thread inputs (batches)
     if (new_input_hexes.size() == 1 && new_batch > 1) new_input_hexes.assign(new_batch, new_input_hex);
@@ -335,6 +337,7 @@ void Core::set_job(
               char hash[HASH_LEN*2+1];
               MessageValues values;
               values["result"] = hash_bin2hex(output, hash);
+              values["input"]  = new_input_hexes[thread_id];
 	      values["rx_thread_id"] = std::to_string(thread_id);
               values["job_id"] = job_id;
               send_msg("test", values);
