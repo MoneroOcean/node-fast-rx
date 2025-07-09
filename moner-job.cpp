@@ -13,6 +13,7 @@
 #include <list>
 #include <set>
 #include <thread>
+#include <sstream>
 
 const unsigned MAX_CN_CPU_WAYS = 5;
 const unsigned MAX_BLOB_LEN    = 512;
