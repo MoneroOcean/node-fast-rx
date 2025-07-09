@@ -208,7 +208,6 @@ void Core::set_job(
   static std::vector<std::vector<uint8_t> > new_inputs;
   new_inputs.clear();
   for (const auto& new_input_hex: new_input_hexes) {
-    std::cout << new_input_hex << std::endl;
     const unsigned new_input_len = new_input_hex.size() >> 1;
     if ((new_input_hex.size() & 1) || new_input_len > MAX_BLOB_LEN)
       throw std::string("Bad input length");
