@@ -74,6 +74,10 @@ module.exports.record_thread = function(thread_id) {
   worker_ids.push(thread_id);
 };
 
+module.exports.is_compute_thread = function(thread_id) {
+  return worker_ids.includes(thread_id);
+};
+
 module.exports.create_thread = function(messageHandler) {
   let thread = cluster.fork({thread_id: 0});
   thread.on("message", messageHandler);
